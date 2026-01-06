@@ -1,6 +1,6 @@
 ---
-title: "City Nature Challenge 2025: Vorarlberg"
-subtitle: https://observation.org/bioblitz/17262/vorarlberg-cnc-2025/
+title: "City Nature Challenge 2026: Vorarlberg"
+subtitle: https://observation.org/bioblitz/19631/vorarlberg-cnc-2026/
 lang: 'de-AT'
 execute:
   warning: false

@@ -14,8 +14,10 @@ date-format: "YYYY-MM-DDTHH:mm:ssZ"
 ---
 
 Links zu den offiziellen Seiten:
+- [City Nature Challenge Global](https://www.citynaturechallenge.org/)
 - [City Nature Challenge Österreich](https://www.citynaturechallenge.at/)
-- [iNaturalist Projekt](https://www.inaturalist.org/projects/city-nature-challenges-in-oesterreich-2026)
+- [Observation.org Global Projekt](https://observation.org/bioblitz/categories/city-nature-challenge-2026/)
+- [iNaturalist Österreich Projekt](https://www.inaturalist.org/projects/city-nature-challenges-in-oesterreich-2026)
 
 {{< include _init.qmd >}}
 

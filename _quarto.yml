@@ -25,6 +25,8 @@ website:
         menu:
           - file: page_steiermark.qmd
             text: "Steiermark"
+          - file: page_kaernten.qmd
+            text: "Kärnten"
           - href: page_salzburg.qmd
             text: "Salzburg"
           - href: page_vorarlberg.qmd
