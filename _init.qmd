@@ -1,0 +1,402 @@
+```{r settings}
+#| include: false
+library(glue)
+library(ggplot2)
+library(scales)
+library(tidyr)
+library(dplyr)
+library(jsonlite)
+library(readr)
+library(stringr)
+library(rmarkdown)
+library(DT)
+library(lubridate)
+library(leaflet)
+library(data.table)
+library(furrr)
+library(purrr)
+library(rlang)
+library(geosphere)
+
+plan(multisession, workers = 2)
+theme_set(theme_classic(base_size = 12))
+colorBlindBlack8 <- c(
+    "#464343", "#E69F00", "#56B4E9", "#009E73",
+    "#F0E442", "#0072B2", "#D55E00", "#CC79A7",
+    "#750a0f", "#669c8e", "#ffaabb", "#cbbb45"
+)
+options(ggplot2.discrete.colour = colorBlindBlack8)
+options(ggplot2.discrete.fill = colorBlindBlack8)
+
+```
+
+```{r projectIds}
+#| include: false
+#| cache: true
+
+# Demo will be overwritten on the next line
+projectIds <- c("Demo" = "27173")
+
+# inaturalist.com
+projectIds <- c("Kärnten" = "179569", "Steiermark" = "266134")
+
+# Observation.org
+locationIds <- c("Vorarlberg" = "606492", "Salzburg" = "606489")
+```
+
+
+```{r loadData}
+#| include: false
+#| cache: true
+
+if (file.exists('data/checkList.rds')) {
+  checkList <- readRDS('data/checkList.rds')
+  birdsList <- readRDS('data/birdsList.rds')
+  taxas <- readRDS('data/taxas.rds')
+} else {
+  # RedList
+  checkList <- fread(
+      "data/data_species_check_list.csv", sep = ",", dec=".", stringsAsFactors = FALSE, encoding = "UTF-8", colClasses = "character"
+    ) |>
+    rename(scientific_name = speciesname) |>
+    distinct(scientific_name, .keep_all = TRUE) |>
+    filter((annex_II_priority != "N" | annex_II != "N" | annex_IV != "N")) 
+  # Birds RedList
+  birdsList <- fread("data/birds.csv", sep = ";", dec=".", stringsAsFactors = FALSE, encoding = "UTF-8", colClasses = "character") |>
+    rename_with(~"scientific_name", 1) |>
+    select(scientific_name, `Annex I`) |>
+    rename(AnnexI = `Annex I`) |>
+    drop_na(AnnexI)
+# German Common Names
+  taxasDE <- fread(
+      'data/VernacularNames-german.csv', sep = ",", dec=".", stringsAsFactors = FALSE, encoding = "UTF-8", colClasses = "character"
+    )[, .(vernacularName = stringr::str_trunc(paste(vernacularName, collapse = ', '), 35)), by = id]
+
+  # Full Taxon Tree Names
+  taxas <- fread('data/taxa.csv', sep = ",", dec=".", stringsAsFactors = FALSE, encoding = "UTF-8", colClasses = "character")[
+    taxasDE, on = "id"][, .(id, scientificName, vernacularName, taxonRank, kingdom, phylum, class, order, family, genus, specificEpithet, infraspecificEpithet)]
+
+  rm(taxasDE)
+  saveRDS(checkList, 'data/checkList.rds')
+  saveRDS(taxas, 'data/taxas.rds')
+  saveRDS(birdsList, 'data/birdsList.rds')
+}
+```
+
+```{r loadFunctions}
+#| include: false
+
+fetchTxt <- function(url){
+  return(base::url(url, headers = c(Accept = "application/json, text/*, */*", "User-Agent" = "city-nature-challenge-austria", "Accept-Language" = "de-AT, en-US")))
+}
+
+# iNaturalist
+loadINat <- function(projectId, projectName = NULL, maxLoops = 1000){
+   tryCatch(
+     exp = {
+      checkIfFileExists <- file.exists(glue("data/inat_{projectId}.csv"))
+      if(checkIfFileExists){
+        message("File exists, loading from file")
+        resultsDf <- fread(
+          glue("data/inat_{projectId}.csv"), sep = ",", dec=".", stringsAsFactors = FALSE, encoding = "UTF-8", colClasses = "character"
+        )
+        return(resultsDf)
+      }
+      apiEndpoint <- "https://api.inaturalist.org/v2/observations"
+      fields <- "(id:!t,uri:!t,quality_grade:!t,num_identification_disagreements:!t,time_observed_at:!t,location:!t,user:(name:!t,id:!t,login:!t),taxon:(id:!t),identifications:(user:(name:!t,login:!t)))"
+      perPage <- 200
+      staticQuery <- glue("project_id={projectId}&order=asc&order_by=id&per_page={perPage}&fields={fields}")
+      
+      aboveId <- 1
+      obsList <- list()
+      loopCounter <- 1
+      while (aboveId > 0) {
+        start_time <- Sys.time()
+
+        obsUrl <- glue("{apiEndpoint}?{staticQuery}&id_above={aboveId}")
+        message(obsUrl)
+        obsFetch <- fetchTxt(obsUrl) |> jsonlite::fromJSON()
+        totalResults <- obsFetch$total_results
+        if(totalResults == 0){
+          message("Empty results")
+          break;
+        }
+        
+        obsTempResults <- obsFetch$results |> unnest(c(taxon, user), names_sep = ".")
+        aboveId <- max(obsTempResults$id)
+        obsList[[loopCounter]] <- obsTempResults |>
+          mutate(across(everything(), as.character)) |>
+          mutate(
+            # Dirty workaround for later parsing of list
+            identifications = str_replace_all(identifications, "\'", "`"),
+            identifications = str_replace_all(identifications, "\"", "'")
+            )
+        
+        if(totalResults <= perPage){
+          message("No more fetches needed")
+          break;
+        }
+        
+        message("Remaining Obs")
+        message(totalResults - perPage)
+        message("Loops to finish")
+        message((totalResults - perPage) / perPage)
+        message("Loops done")
+        message(loopCounter)
+        
+        if(loopCounter >= maxLoops){
+          warning("Breaking early because max loop limit")
+          break;
+        }
+        
+        loopCounter <- loopCounter + 1
+        elapsed_time <- Sys.time() - start_time
+        sleep_time <- max(0, 1 - as.numeric(elapsed_time, units = "secs"))
+        Sys.sleep(sleep_time)
+      }
+      if(length(obsList) == 0){
+        message("No results")
+        return(NULL)
+      }
+
+      # Backward compatibility so we don't need to set the name on every function call 
+      projectName <- ifelse(is.null(projectName), names(projectId), projectName)
+      
+      resultsDf <- bind_rows(obsList) |>
+        left_join(taxas, by = c('taxon.id' = 'id')) |>
+        mutate(
+          user.name = ifelse(is.na(user.name) | user.name == '', user.login, user.name),
+          project.id = projectId,
+          project.name = projectName,
+          project.type = "inat",
+          uri_html = glue("<a href='{uri}'>{id}</a>"),
+          
+          # needed to work with obs
+          validation_status = ""
+        ) |>
+        distinct(uuid, .keep_all = TRUE) # catch any possible double entries due to our loop logic
+
+      fwrite(resultsDf, paste0("data/inat_", projectId, ".csv"), quote = TRUE)
+      return(resultsDf)
+     },
+    error = function(e){
+      message('Caught an error!')
+      print(e)
+      return(NULL)
+    },
+    warning = function(w){
+      message('Caught an warning!')
+      print(w)
+      return(NULL)
+    },
+    finally = {
+      message('All done, quitting.')
+    }
+  )
+}
+
+# https://observation.org/api/v1/lookups
+lookup <- jsonlite::fromJSON("data/lookup.json") |>
+          map(~ bind_rows(.x)) |>
+          imap(\(x, idx) x %>% rename_with(~paste0(idx, "_name", recycle0 = TRUE), .cols = "name"))
+
+
+
+# Observation.org
+loadObs <- function(locationId, locationName = NULL, maxLoops = 1000, date_after = "2026-04-24", date_before = "2026-04-27"){
+   tryCatch(
+     exp = {
+      checkIfFileExists <- file.exists(glue("data/obs_{locationId}.csv"))
+      if(checkIfFileExists){
+        message("File exists, loading from file")
+        resultsDf <- fread(
+          glue("data/obs_{locationId}.csv"), sep = ",", dec=".", stringsAsFactors = FALSE, encoding = "UTF-8", colClasses = "character"
+        )
+        return(resultsDf)
+      }
+      apiEndpoint <- glue("https://observation.org/api/v1/locations/{locationId}/observations/")
+      perPage <- 5000
+      staticQuery <- glue("limit={perPage}&date_after={date_after}&date_before={date_before}")
+      obsUrl <- glue("{apiEndpoint}?{staticQuery}")
+
+      obsList <- list()
+      loopCounter <- 1
+      while (TRUE) {
+        start_time <- Sys.time()
+
+        message(obsUrl)
+        obsFetch <- fetchTxt(obsUrl) |> jsonlite::fromJSON()
+        totalResults <- obsFetch$count
+        if(totalResults == 0){
+          message("Empty results")
+          break;
+        }
+        
+        obsTempResults <- obsFetch$results
+        
+        obsTempResults <- obsTempResults |> 
+            unnest_wider(species_detail, names_sep = "_") |>
+            unnest_wider(point, names_sep = "_") |>
+            drop_na(point_type, point_coordinates) |>
+            mutate(
+              latitude = purrr::map_dbl(point_coordinates, ~ .x[[1]][2]),
+              longitude = purrr::map_dbl(point_coordinates, ~ .x[[1]][1]),
+              location = glue("{latitude},{longitude}")
+            ) |>
+            select(-point_coordinates, -observer_location)
+        
+        aboveId = max(obsTempResults$id)
+        obsList[[loopCounter]] <- obsTempResults
+        
+        if(totalResults <= perPage){
+          message("No more fetches needed")
+          break;
+        }
+        
+        if(is.null(obsFetch$`next`)){
+          message('All fetched')
+          break;
+        }
+        obsUrl <- obsFetch$`next`
+        
+        message("Remaining Obs")
+        message(totalResults - perPage)
+        message("Loops to finish")
+        message((totalResults - perPage) / perPage)
+        message("Loops done")
+        message(loopCounter)
+        
+        if(loopCounter >= maxLoops){
+          warning("Breaking early because max loop limit")
+          break;
+        }
+        
+        loopCounter <- loopCounter + 1
+        elapsed_time <- Sys.time() - start_time
+        #sleep_time <- max(0, 1 - as.numeric(elapsed_time, units = "secs"))
+        #Sys.sleep(sleep_time)
+      }
+      
+      if(length(obsList) == 0){
+        message("No results")
+        return(NULL)
+      }
+      
+      # Backward compatibility so we don't need to set the name on every function call 
+      locationName <- ifelse(is.null(locationName), names(locationId), locationName)
+      
+      resultsDf <- bind_rows(obsList)  |>
+            left_join(lookup$species_type, by = c("species_detail_type" = "id")) |>
+            left_join(lookup$rarity, by = c("rarity" = "id")) |>
+            left_join(lookup$validation_status, by = c("validation_status" = "id")) |>
+            left_join(lookup$species_status, by = c("species_status" = "id")) |>
+            
+            mutate(
+              # Create similar structure to iNaturalist
+              time_observed_at = glue("{date} {time}:00") |> as.character(),
+              project.id = locationId,
+              project.name = locationName,
+              project.type = "obs",
+              user.id = user_detail$id,
+              uri_html = glue("<a href='{permalink}'>{permalink}</a>"),
+              user.name = ifelse(is.na(user_detail$name) | user_detail$name == '', user_detail$login, user_detail$name),
+              uri = permalink,
+              scientificName = species_detail_scientific_name,
+              vernacularName = species_detail_name,
+              quality_grade = ""
+            ) |>
+            # Drop nested columns and convert all to chr for joining with iNat
+            select(-c("user_detail", "location_detail", "links", "details")) |>
+            mutate(across(everything(), as.character))
+      
+      fwrite(resultsDf, paste0("data/obs_", locationId, ".csv"), quote = TRUE)
+      return(resultsDf)
+     },
+    error = function(e){
+      message('Caught an error!')
+      print(e)
+      return(NULL)
+    },
+    warning = function(w){
+      message('Caught an warning!')
+      print(w)
+      return(NULL)
+    },
+    finally = {
+      message('All done, quitting.')
+    }
+  )
+}
+```
+
+```{r utils}
+#| include: false
+#| cache: true
+
+# Filter species level
+filterSpeciesLevel <- function(df){
+  df %>%  
+    filter(
+      (project.type == 'inat' & 
+       (if (all(has_name(., "taxonRank"))) {
+          (taxonRank %in% c('species', 'subspecies'))
+        } else {
+          FALSE 
+        })
+      ) |
+      (project.type == 'obs' & 
+       (if (all(has_name(., "species_detail_type"))) {
+          (species_detail_type %in% c('S', 'I'))
+        } else {
+          FALSE
+        })
+      )
+    )
+}
+
+# Filter species level and only research grade or with a valid validation status 
+filterSpeciesLevelResearch <- function(df){
+  df %>%  
+    filter(
+      (project.type == 'inat' & 
+       (if (all(has_name(., "taxonRank"), has_name(., "quality_grade"))) {
+          (taxonRank %in% c('species', 'subspecies')) & quality_grade == 'research'
+        } else {
+          FALSE 
+        })
+      ) |
+      (project.type == 'obs' & 
+       (if (all(has_name(., "species_detail_type"), has_name(., "validation_status"))) {
+          (species_detail_type %in% c('S', 'I')) & validation_status %in% c("J", "A", "P")
+        } else {
+          FALSE
+        })
+      )
+    )
+}
+
+loadAll <- function(){
+  future_iNat <- future({
+    message("Starting iNat data fetch...")
+    data_list <- purrr::imap(projectIds, \(id, idx) loadINat(id, idx))
+    message("Finished iNat data fetch.")
+    bind_rows(data_list)
+  })
+  
+  future_Obs <- future({
+    message("Starting Obs data fetch...")
+    data_list <- purrr::imap(locationIds, \(id, idx) loadObs(id, idx))
+    message("Finished Obs data fetch.")
+    bind_rows(data_list)
+  })
+  
+  message("Waiting for data fetching to complete...")
+  combined_inat_data <- value(future_iNat)
+  combined_obs_data <- value(future_Obs)
+  resultsDf <- bind_rows(list(combined_inat_data, combined_obs_data))
+  message("Data fetching complete.")
+  return(resultsDf)
+}
+
+
+```

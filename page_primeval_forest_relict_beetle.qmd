@@ -1,0 +1,73 @@
+---
+title: "City Nature Challenge: Urwaldreliktkäfer"
+lang: 'de-AT'
+bibliography: references.bib
+execute:
+  warning: false
+  error: false
+  echo: false
+order: 1
+date: last-modified
+date-format: "YYYY-MM-DDTHH:mm:ssZ"
+---
+
+Diese Seite listet die während der City Nature Challenge in allen teilnehmenden Regionen beobachteten Urwaldreliktkäfer (Coleoptera) auf. Die Artenliste basiert auf @eckelt2018.
+
+{{< include _init.qmd >}}
+
+```{r loadRelictSpecies}
+#| include: false
+#| cache: false
+relictSpecies <- readr::read_csv2("data/primeval_forest_relict_beetle.csv")
+```
+
+
+```{r init}
+#| include: false
+#| cache: false
+resultsDf <- loadAll()
+
+if(is.null(resultsDf) || nrow(resultsDf) == 0){
+  resultsDf <- NULL
+  message("No data loaded from either source.")
+} else {
+   message(paste("Loaded", nrow(resultsDf), "total observations."))
+}
+```
+
+```{r relictTable}
+if(!is.null(resultsDf)){
+  resultsDf |> 
+    filterSpeciesLevel() |>
+    left_join(relictSpecies, by = c('scientificName' = 'Species')) |>
+    filter(!is.na(Category)) |>
+    select(
+        "Link" = uri_html,
+        "Spezies" = scientificName, 
+        "Familie" = Family, 
+        "Kategorie" = Category, 
+        "Region" = project.name, 
+        'Umgangspr. Name' = vernacularName
+        ) |>
+    datatable(
+      rownames = FALSE, 
+      escape = FALSE,
+      filter = list(
+        position = 'bottom',
+        clear = FALSE,
+        plain = TRUE
+     ),
+      options = list(
+        columnDefs = list(list(type = 'html', targets = c(1)))
+      )
+    )
+} else {
+  print('Noch keine Beobachtungen')
+}
+```
+
+
+## References
+
+::: {#refs}
+:::

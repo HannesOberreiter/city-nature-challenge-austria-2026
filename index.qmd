@@ -1,0 +1,110 @@
+---
+title: "City Nature Challenges in Österreich, 24.-27. April 2026"
+lang: 'de-AT'
+execute:
+  warning: false
+  error: false
+  echo: false
+order: 1
+format:
+    html:
+        df-print: paged
+date: last-modified
+date-format: "YYYY-MM-DDTHH:mm:ssZ"
+---
+
+Links zu den offiziellen Seiten:
+- [City Nature Challenge Österreich](https://www.citynaturechallenge.at/)
+- [iNaturalist Projekt](https://www.inaturalist.org/projects/city-nature-challenges-in-oesterreich-2026)
+
+{{< include _init.qmd >}}
+
+```{r init}
+#| include: false
+#| cache: false
+resultsDf <- loadAll()
+
+if(is.null(resultsDf) || nrow(resultsDf) == 0){
+  resultsDf <- NULL
+  message("No data loaded from either source.")
+} else {
+   message(paste("Loaded", nrow(resultsDf), "total observations."))
+}
+```
+
+```{r CompareProjects}
+#| label: fig-projects
+#| fig-cap: "Vergleich der Anzahl Beobachtungen pro Projektregion"
+if(!is.null(resultsDf)){
+  resultsDf |>
+    group_by(project.name) |>
+    summarise(n = n()) |>
+    ggplot(
+      aes(x = reorder(project.name, n), y = n, fill = project.name)
+      ) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    coord_flip() +
+    labs(x = "Projektregion", y = "Anzahl der Beobachtungen")+
+    theme(
+      panel.grid.major.x = element_line()
+    )
+} else {
+  print('Noch keine Beobachtungen')
+}
+```
+
+## Vergleich der Regionen
+
+Die folgende Tabelle zeigt einen Vergleich der teilnehmenden Regionen anhand verschiedener Kennzahlen.
+
+```{r CompareProjects2}
+if(!is.null(resultsDf)){
+  resultsDf |>
+    group_by(project.name) |>
+    summarise(
+      nObserver = n_distinct(user.name),
+      nObservations = n(),
+      nTaxa = n_distinct(scientificName),
+      nResearchGrade = sum(quality_grade == "research", na.rm = TRUE) + sum(validation_status %in% c("J", "A", "P"), na.rm = TRUE),
+      ) |>
+    select("Region" = project.name, "BeobachterInnen (#)" = nObserver, "Beobachtungen (#)" = nObservations, "Taxa (#)" = nTaxa, "Research Grade (#)" = nResearchGrade) |>
+    datatable(rownames = FALSE)
+} else {
+  print('Noch keine Beobachtungen')
+}
+```
+
+## Beobachtungen nach Regnum (iNaturalist)
+
+Die Grafik zeigt die absolute Anzahl der Beobachtungen pro Regnum (Reich), aufgeteilt nach den teilnehmenden Regionen.
+
+```{r plotRegnum}
+#| label: fig-Regnum
+#| fig-cap: "Absolute Anzahl der Beobachtungen pro Reich, aufgeteilt nach Regionen (nur iNaturalist)"
+if(!is.null(resultsDf)){
+  resultsDf |> 
+    filter(project.type == 'inat') |>
+    drop_na(kingdom) |> 
+    count(kingdom, project.name) |> 
+    select(n, "Region" = project.name, kingdom) |>
+    ggplot() +
+      aes(x = kingdom, y = n, fill = Region) +
+      geom_bar(position = 'dodge', stat='identity', show.legend = TRUE) +
+      labs(
+        y = "Anzahl Beobachtungen pro Regnum",
+        x = ""
+      ) +
+      scale_y_continuous(
+        labels = scales::label_number(),
+      ) +
+      coord_flip(clip="off") +
+      theme(
+        panel.grid.major.x = element_line()
+      )
+} else {
+  print('Noch keine Beobachtungen')
+}
+```
+
+
+{{< include _body.qmd >}}
