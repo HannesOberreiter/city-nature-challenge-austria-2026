@@ -1,6 +1,6 @@
 ---
-title: "City Nature Challenge 2026: Steiermark (Graz)"
-subtitle: https://www.inaturalist.org/projects/city-nature-challenge-2026-steiermark-graz
+title: "City Nature Challenge 2026: Krems - Wachau - Melk"
+subtitle: https://www.inaturalist.org/projects/city-nature-challenge-2026-krems-wachau-melk
 lang: 'de-AT'
 execute:
   warning: false
@@ -16,9 +16,8 @@ date-format: "YYYY-MM-DDTHH:mm:ssZ"
 ```{r init}
 #| include: false
 #| cache: false
-projectId <- c("Steiermark (Graz)" = "266134")
+projectId <- c("Krems - Wachau - Melk" = "264407")
 resultsDf <- loadINat(projectId)
 ```
 
 {{< include _body.qmd >}}
-

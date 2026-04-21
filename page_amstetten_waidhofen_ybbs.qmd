@@ -1,6 +1,6 @@
 ---
-title: "City Nature Challenge 2026: Steiermark (Graz)"
-subtitle: https://www.inaturalist.org/projects/city-nature-challenge-2026-steiermark-graz
+title: "City Nature Challenge 2026: Amstetten - Waidhofen/Ybbs"
+subtitle: https://www.inaturalist.org/projects/city-nature-challenge-2026-amstetten-waidhofen-ybbs
 lang: 'de-AT'
 execute:
   warning: false
@@ -16,9 +16,8 @@ date-format: "YYYY-MM-DDTHH:mm:ssZ"
 ```{r init}
 #| include: false
 #| cache: false
-projectId <- c("Steiermark (Graz)" = "266134")
+projectId <- c("Amstetten - Waidhofen/Ybbs" = "275608")
 resultsDf <- loadINat(projectId)
 ```
 
 {{< include _body.qmd >}}
-

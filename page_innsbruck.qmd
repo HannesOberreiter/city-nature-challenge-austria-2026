@@ -1,6 +1,6 @@
 ---
-title: "City Nature Challenge 2026: Steiermark (Graz)"
-subtitle: https://www.inaturalist.org/projects/city-nature-challenge-2026-steiermark-graz
+title: "City Nature Challenge 2026: Innsbruck"
+subtitle: https://www.inaturalist.org/projects/city-nature-challenge-2026-innsbruck
 lang: 'de-AT'
 execute:
   warning: false
@@ -16,9 +16,8 @@ date-format: "YYYY-MM-DDTHH:mm:ssZ"
 ```{r init}
 #| include: false
 #| cache: false
-projectId <- c("Steiermark (Graz)" = "266134")
+projectId <- c("Innsbruck" = "270093")
 resultsDf <- loadINat(projectId)
 ```
 
 {{< include _body.qmd >}}
-

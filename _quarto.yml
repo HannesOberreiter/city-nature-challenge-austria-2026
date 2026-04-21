@@ -23,14 +23,32 @@ website:
         text: "Übersicht"
       - text: "Regionen"
         menu:
-          - file: page_steiermark.qmd
-            text: "Steiermark"
+          - file: page_amstetten_waidhofen_ybbs.qmd
+            text: "Amstetten - Waidhofen/Ybbs"
+          - file: page_elsbeere_wienerwald.qmd
+            text: "Elsbeere Wienerwald"
+          - file: page_innsbruck.qmd
+            text: "Innsbruck"
           - file: page_kaernten.qmd
             text: "Kärnten"
+          - file: page_krems_wachau_melk.qmd
+            text: "Krems - Wachau - Melk"
+          - file: page_naturparke_noe.qmd
+            text: "Naturparke NÖ"
+          - file: page_neusiedler_see_seewinkel.qmd
+            text: "Neusiedler See/Seewinkel"
           - href: page_salzburg.qmd
             text: "Salzburg"
+          - file: page_st_poelten.qmd
+            text: "St. Pölten"
+          - file: page_steiermark.qmd
+            text: "Steiermark (Graz)"
+          - file: page_steyr.qmd
+            text: "Steyr"
           - href: page_vorarlberg.qmd
             text: "Vorarlberg"
+          - file: page_wien.qmd
+            text: "Wien"
       - text: "Analysen"
         menu:
           - file: page_primeval_forest_relict_beetle.qmd

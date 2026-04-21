@@ -38,7 +38,19 @@ options(ggplot2.discrete.fill = colorBlindBlack8)
 projectIds <- c("Demo" = "27173")
 
 # inaturalist.com
-projectIds <- c("Kärnten" = "179569", "Steiermark" = "266134")
+projectIds <- c(
+  "Amstetten - Waidhofen/Ybbs" = "275608",
+  "Elsbeere Wienerwald" = "265724",
+  "Innsbruck" = "270093",
+  "Kärnten" = "179569",
+  "Krems - Wachau - Melk" = "264407",
+  "Naturparke NÖ" = "270880",
+  "Neusiedler See/Seewinkel" = "272830",
+  "St. Pölten" = "265289",
+  "Steiermark (Graz)" = "266134",
+  "Steyr" = "266708",
+  "Wien" = "264285"
+)
 
 # Observation.org
 locationIds <- c("Vorarlberg" = "606492", "Salzburg" = "606489")
